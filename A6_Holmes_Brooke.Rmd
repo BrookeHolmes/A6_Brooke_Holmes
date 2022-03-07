@@ -1,0 +1,80 @@
+---
+title: "A6_Holmes_Brooke"
+author: "Brooke Holmes"
+date: "02/03/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+GitHub: https://github.com/BrookeHolmes/A6_Brooke_Holmes
+
+```{r}
+library(muscle)
+library(annotate)
+library(muscle)
+library(dplyr)
+library(Biostrings)
+library(ggplot2)
+library(BiocManager)
+library(reshape2)
+library(rentrez)
+library(ape)
+library(ggtree)
+```
+
+```{r}
+#loading sequence
+seq <- "ATGTCTGATAATGGACCCCAAAATCAGCGAAATGCACCCCGCATTACGTTTGGTGGACCCTCAGATTCAACTGGCAGTAACCAGAATGGAGAACGCAGTGGGGCGCGATCAAAACAACGTCGGCCCCAAGGTTTACCCAATAATACTGCGTCTTGGTTCACCGCTCTCACTCAACATGGCAAGGAAGACCTTAAATTCCCTCGAGGACAAGGCGTTCCAATTAACACCAATAGCAGTCCAGATGACCAAATTGGCTACTACCGAAGAGCTACCAGACGAATTCGTGGTGGTGACGGTAAAATGAAAGATCTCAGTCCAAGATGGTATTTCTACTACCTAGGAACTGGGCCAGAAGCTGGACTTCCCTATGGTGCTAACAAAGACGGCATCATATGGGTTGCAACTGAGGGAGCCTTGAATACACCAAAAGATCACATTGGCACCCGCAATCCTGCTAACAATGCTGCAATCGTGCTACAACTTCCTCAAGGAACAACATTGCCAAAAGGCTTCTACGCAGAAGGGAGCAGAGGCGGCAGTCAAGCCTCTTCTCGTTCCTCATCACGTAGTCGCAACAGTTCAAGAAATTCAACTCCAGGCAGCAGTAGGGGAACTTCTCCTGCTAGAATGGCTGGCAATGGCGGTGATGCTGCTCTTGCTTTGCTGCTGCTTGACAGATTGAACCAGCTTGAGAGCAAAATGTCTGGTAAAGGCCAACAACAACAAGGCCAAACTGTCACTAAGAAATCTGCTGCTGAGGCTTCTAAGAAGCCTCGGCAAAAACGTACTGCCACTAAAGCATACAATGTAACACAAGCTTTCGGCAGACGTGGTCCAGAACAAACCCAAGGAAATTTTGGGGACCAGGAACTAATCAGACAAGGAACTGATTACAAACATTGGCCGCAAATTGCACAATTTGCCCCCAGCGCTTCAGCGTTCTTCGGAATGTCGCGCATTGGCATGGAAGTCACACCTTCGGGAACGTGGTTGACCTACACAGGTGCCATCAAATTGGATGACAAAGATCCAAATTTCAAAGATCAAGTCATTTTGCTGAATAAGCATATTGACGCATACAAAACATTCCCACCAACAGAGCCTAAAAAGGACAAAAAGAAGAAGGCTGATGAAACTCAAGCCTTACCGCAGAGACAGAAGAAACAGCAAACTGTGACTCTTCTTCCTGCTGCAGATTTGGATGATTTCTCCAAACAATTGCAACAATCCATGAGCAGTGCTGACTCAACTCAGGCCTAA"
+```
+
+BLAST
+```{r}
+#finding pairwise alignments
+seqBLAST<-blastSequences(paste(seq), as = 'data.frame', hitListSize = 20, timeout = 600)
+paste(seqBLAST$Hit_def)
+seqDF <- data.frame(ID = seqBLAST$Hit_accession,Seq = seqBLAST$Hsp_hseq, stringsAsFactors = F)
+```
+All 20 matches are severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2 from the USA
+
+
+Generating an Alignment
+```{r}
+seqHitsDNAstring <- seqDF$Seq %>% # Start with the sequences
+  as.character %>% # Be sure to convert to strings
+  lapply(.,paste0,collapse="") %>% # Collapse each sequence to a single string
+  unlist %>% # Flatten list to a vector
+  DNAStringSet # Convert vector to DNAStringSet object
+
+names(seqHitsDNAstring) <- paste(1:nrow(seqDF), seqDF$ID,sep="_")
+
+BbAlign <- muscle::muscle(stringset = seqHitsDNAstring, quiet=T)
+BbAlign
+```
+Figure 1. DNA multiple alignment which depicts that they each contain a distinct genetic sequence that is identical.
+
+Distance Matrix
+```{r}
+#calculating genetic distances, converting to matrix and changing to linear matrix
+seqAlignBin <- as.DNAbin(BbAlign)
+seqDM <- dist.dna(seqAlignBin, model = "K80")
+seqDMmat <- as.matrix(seqDM)
+seqDat <- melt(seqDMmat)
+
+#plotting matrix
+ggplot(data = seqDat, aes(x=Var1, y=Var2, fill=value)) +
+  geom_tile() +  labs(x = "Sequence", y = "Sequence", fill = "Distance") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+Figure 2. Shown by the same colour throughout the matrix, all of the 20 sequences have the same distance of 0 from each other. This implies that between the sequences, there is a lack of evolutionary divergence.
+
+Phylogeny
+```{r}
+seqTree <- nj(seqDM)
+
+#creating phylogeny tree
+ggtree(seqTree, branch.length = "none", layout = "radial") +
+  geom_tiplab()
+```
+Figure 3. The phylogeny tree shows that all the sequences are connected on the same line. This indicates that that all the sequences are very closely related.
+
+
